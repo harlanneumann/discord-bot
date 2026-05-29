@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import datetime
 import time
-
+import schedule
 
 import discord
 from discord import File
@@ -83,6 +83,25 @@ class InitBallot(discord.ui.View):
         self.results.callback = self.seeCurrentResults
         self.add_item(self.results)
 
+        #Ballots will be added to this list to avoid the "one user votes at a time" glitch.
+        #This class will check every 20 minutes for ballots that are either complete or timed out and clear them from memory
+        self.ballotViews: Ballot = []
+        def cleanBallotViews():
+            endCriteria = range(len(self.ballotViews))
+            for ballot in endCriteria:
+                if self.ballotViews[ballot].complete:
+                    del self.ballotViews[ballot]
+                    ballot -= 1
+                    endCriteria -= 1
+            #This solely exists for testing and will be removed in future PRs
+            print("Ballot Views")
+            print(self.ballotViews)
+        schedule.every(20).minutes.do(cleanBallotViews)
+        
+        
+
+
+
         
 
     #function to send Ballot. Technically all buttons can begin a ballot to avoid frusturations with users who dont understand STAR voting
@@ -94,7 +113,8 @@ class InitBallot(discord.ui.View):
             await interaction.followup.send("You have already voted in this election", ephemeral=True)
         elif not alrVot:
             view = Ballot(self.bot, self.title, self.candidates, self.BVIObject)
-            await interaction.followup.send(view.description, view= view, ephemeral=True)
+            self.ballotViews.append(view)
+            await interaction.followup.send(view.description, view= self.ballotViews[-1], ephemeral=True)
         else:
             await interaction.followup.send("There was a server error. Please try again later.", ephemeral=True)
     
@@ -193,6 +213,8 @@ class Ballot(discord.ui.View):
         self.title = title
         self.candidates = candidates
         self.description = description
+        #This variable is set to True when the ballot is either submitted or times out so the InitBallot can clear it from memory
+        self.complete = False
 
         self.introText: str = self.description
 
@@ -301,7 +323,6 @@ class Ballot(discord.ui.View):
         scores = []
         for i in self.save.scores:
             scores.append(translateEmoji(i))
-        
 
         #TODO implement responses for user already voted and failed to send vote
         #Submit ballot, or handle errors
@@ -334,8 +355,13 @@ class Ballot(discord.ui.View):
         
         #Send confirmation
         await interaction.edit_original_response(content=text, attachments=files, view=None)
+        self.complete = True
     async def pageCounterCallback(self, interaction: discord.Interaction):
         await deferInt(interaction)
+    #ballot is void after 900 seconds
+    #TODO add a feature that resets the timer after any activity
+    async def on_timeout(self):
+        self.complete = True
 
 
     #used for debugging
