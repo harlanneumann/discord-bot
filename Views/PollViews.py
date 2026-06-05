@@ -43,6 +43,20 @@ def prepView(BVIObject) -> dict:
     retData["candidates"] = candidates
 
     return retData
+
+#Class to keep track of ballot views. There should only be one object of this class
+#TODO automatically cull old IBs
+class InitBallotTracker():
+    def __init__(self):
+        self.initBallots = {}
+        self.counter = 1
+
+    def addInitBallot(self, view):
+        num = self.counter
+        self.counter += 1
+        self.initBallots[str(num)] = view
+        return num
+
 #defer an interaction
 async def deferInt(interaction: discord.Interaction):
     logger.log(f"Responding to interaction that expires at {interaction.expires_at} initiated by user {interaction.user}", False, False)
@@ -374,10 +388,11 @@ class Ballot(discord.ui.View):
 
 #Sent after discord native poll is sent. Clicking the button deletes the poll and makes a STAR poll with that data
 class turnToBV(discord.ui.View):
-    def __init__(self, bot: commands.bot, message: discord.Message):
+    def __init__(self, bot: commands.bot, message: discord.Message, initBallotTrackerObj : InitBallotTracker):
         super().__init__(timeout=300)
         self.bot = bot
         self.message:discord.Message = message
+        self.initBallotTrackerObj = initBallotTrackerObj
         self.btn = Button(label="Click Here to Turn Into a STAR Poll", style=discord.ButtonStyle.primary)
         self.btn.callback = self.callback
         self.add_item(self.btn)
@@ -411,8 +426,9 @@ class turnToBV(discord.ui.View):
 
         #make Init ballot, save it to database, and delete the change to STAR button
         view=InitBallot(self.bot, Translator.electJSON, Translator)
-        msg: discord.Message = await interaction.followup.send(embed=view.titleTXT, view=view)
-        view.saveToSQL(msg.id, msg.channel.id)
+        index = str(self.initBallotTrackerObj.addInitBallot(view))
+        msg: discord.Message = await interaction.followup.send(embed=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])
+        self.initBallotTrackerObj.initBallots[index].saveToSQL(msg.id, msg.channel.id)
         await self.message.delete()
         await self.on_timeout()
 

@@ -38,6 +38,7 @@ if __name__ == "__main__":
     #dictionary containing BVI Translator objects. There is one per election
     elections: BVI.BVWebTranslator = {}
     views = {}
+    initBallotViews = PollViews.InitBallotTracker()
 
     #Command to get an election from better voting and begin voting in discord
     #command syntax is /linkpoll [electionID]
@@ -50,9 +51,10 @@ if __name__ == "__main__":
     )
     async def link_poll(interaction: discord.Interaction, electionid: str):
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
-        view = await pollLink(interaction, electionid)
-        msg = await interaction.response.send_message(embed = view.titleTXT, view=view)
-        view.saveToSQL(msg.message_id, interaction.channel_id)
+        await pollLink(interaction, electionid)
+        index = str(initBallotViews.addInitBallot(views[electionid]))
+        msg = await interaction.response.send_message(embed = initBallotViews.initBallots[index].titleTXT, view=initBallotViews.initBallots[index])
+        initBallotViews.initBallots[index].saveToSQL(msg.message_id, interaction.channel_id)
 
     async def pollLink(interaction: discord.Interaction, electionid: str) -> discord.ui.View:
         Translator: BVI.BVWebTranslator = BVI.BVWebTranslator()
@@ -67,7 +69,7 @@ if __name__ == "__main__":
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
         view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator)
         views[electionid] = view
-        return view
+        return elections[electionid]
 
     @bot.event
     async def on_message(message: discord.Message):
@@ -77,7 +79,7 @@ if __name__ == "__main__":
             return
         
         #If the message is a poll respond with the turnToBV view which alows the user to turn it into a STAR poll
-        view = PollViews.turnToBV(bot, message)
+        view = PollViews.turnToBV(bot, message, initBallotViews)
         sentMessage : discord.Message = await message.reply(view=view)
         #this function is necessary so the message can delete itself after 5 minutes
         view.ownData(sentMessage.channel.id, sentMessage.id)
