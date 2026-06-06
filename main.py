@@ -51,12 +51,11 @@ if __name__ == "__main__":
     )
     async def link_poll(interaction: discord.Interaction, electionid: str):
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
-        await pollLink(interaction, electionid)
-        index = str(initBallotViews.addInitBallot(views[electionid]))
+        index = await pollLink(interaction, electionid)
         msg = await interaction.response.send_message(embed = initBallotViews.initBallots[index].titleTXT, view=initBallotViews.initBallots[index])
         initBallotViews.initBallots[index].saveToSQL(msg.message_id, interaction.channel_id)
 
-    async def pollLink(interaction: discord.Interaction, electionid: str) -> discord.ui.View:
+    async def pollLink(interaction: discord.Interaction, electionid: str) -> str:
         Translator: BVI.BVWebTranslator = BVI.BVWebTranslator()
         Translator.createToken("DisBot")
         try:
@@ -68,8 +67,8 @@ if __name__ == "__main__":
         
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
         view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator)
-        views[electionid] = view
-        return elections[electionid]
+        index = initBallotViews.addInitBallot(view)
+        return str(index)
 
     @bot.event
     async def on_message(message: discord.Message):
@@ -111,8 +110,8 @@ if __name__ == "__main__":
                     print(rows[i][2])
                     print(rows[i][1])
                     msg = await bot.get_channel(rows[i][2]).fetch_message(rows[i][1])
-                    view = await pollLink(None, rows[i][3])
-                    await msg.edit(view=view)
+                    index = await pollLink(None, rows[i][3])
+                    await msg.edit(view=initBallotViews.initBallots[index])
                 except:
                     print("message not found, likely deleted by users")
             print("Persistent views synced. Prior InitBallots are usable")   

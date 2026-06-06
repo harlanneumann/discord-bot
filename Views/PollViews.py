@@ -99,6 +99,7 @@ class InitBallot(discord.ui.View):
 
         #Ballots will be added to this list to avoid the "one user votes at a time" glitch.
         #This class will check every 20 minutes for ballots that are either complete or timed out and clear them from memory
+        #TODO adjust this to use a dictionary
         self.ballotViews: Ballot = []
         def cleanBallotViews():
             endCriteria = range(len(self.ballotViews))
@@ -128,7 +129,8 @@ class InitBallot(discord.ui.View):
         elif not alrVot:
             view = Ballot(self.bot, self.title, self.candidates, self.BVIObject)
             self.ballotViews.append(view)
-            await interaction.followup.send(view.description, view= self.ballotViews[-1], ephemeral=True)
+            msgID = await interaction.followup.send(view.description, view= self.ballotViews[-1], ephemeral=True)
+            self.ballotViews[-1].msgID = msgID.id
         else:
             await interaction.followup.send("There was a server error. Please try again later.", ephemeral=True)
     
@@ -182,7 +184,7 @@ class Ballot(discord.ui.View):
             rankLabels = ["❌", "⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"]
             #concats candidate name and rank labels for select menu options
             for i in range(len(rankLabels)):
-                text = (f"{candName}: {rankLabels[i]}")
+                text = (f"{rankLabels[i]}: {candName}")
                 options.append(discord.SelectOption(label=text, value=rankLabels[i]))
 
             super().__init__(placeholder=self.candName, min_values=0, max_values=1, options=options)
@@ -229,6 +231,8 @@ class Ballot(discord.ui.View):
         self.description = description
         #This variable is set to True when the ballot is either submitted or times out so the InitBallot can clear it from memory
         self.complete = False
+        #this views message ID. Will be assigned by initBallot
+        self.msgID = None
 
         self.introText: str = self.description
 
@@ -368,7 +372,7 @@ class Ballot(discord.ui.View):
         
         
         #Send confirmation
-        await interaction.edit_original_response(content=text, attachments=files, view=None)
+        await interaction.followup.edit_message(message_id=self.msgID, content=text, attachments=files, view=None)
         self.complete = True
     async def pageCounterCallback(self, interaction: discord.Interaction):
         await deferInt(interaction)

@@ -257,6 +257,11 @@ class BVWebTranslator:
         p2.join()
         #return the pngID. Lead with 1 to get the score round, lead with 2 to get the runoff
         return pngID
+
+    #Create an ASCII bar graph instead to reduce load times
+    def createASCIIBar(self) -> str:
+        pass
+
         
         
     #Get a simple list of candidate names and scores. Sorting is unnecessary, they arrive in order
