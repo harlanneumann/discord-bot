@@ -52,7 +52,7 @@ if __name__ == "__main__":
     async def link_poll(interaction: discord.Interaction, electionid: str):
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
         index = await pollLink(interaction, electionid)
-        msg = await interaction.response.send_message(embed = initBallotViews.initBallots[index].titleTXT, view=initBallotViews.initBallots[index])
+        msg = await interaction.response.send_message(embeds = initBallotViews.initBallots[index].titleTXT, view=initBallotViews.initBallots[index])
         initBallotViews.initBallots[index].saveToSQL(msg.message_id, interaction.channel_id)
 
     async def pollLink(interaction: discord.Interaction, electionid: str) -> str:

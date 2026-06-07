@@ -79,15 +79,32 @@ class InitBallot(discord.ui.View):
         print(f"The title is {self.title}")
         self.description = data['election']["description"]
         self.candidates = data['election']['races'][0]['candidates']
+        self.titleTXT = [discord.Embed(title=self.title, description= self.description)]
 
-        self.titleTXT = discord.Embed(title=self.title, description= self.description)
+        #Determine whether to use buttons or bullet points. Usually use buttons, unless a candidater is longer than 15 char or theres more than 20 cands
+        buttons: bool = True
+        if len(self.candidates) > 20:
+            buttons = False
 
-        #set up candidates as items in the UI
-        self.candItems = []
-        for i in range(len(self.candidates)):
-            self.candItems.append(Button(label=self.candidates[i]['candidate_name']))
-            self.candItems[i].callback = self.button_callback
-            self.add_item(self.candItems[i])
+        if buttons:
+            #set up candidates as items in the UI
+            self.candItems = []
+            for i in range(len(self.candidates)):
+                if len(self.candidates[i]['candidate_name']) > 15:
+                    buttons = False
+                    break
+                self.candItems.append(Button(label=self.candidates[i]['candidate_name']))
+                self.candItems[i].callback = self.button_callback
+            if buttons:
+                for i in self.candItems:
+                    self.add_item(i)
+        if not buttons:
+            text = ""
+            for cand in self.candidates:
+                text = f"{text}\n● {cand['candidate_name']}"
+            embed = discord.Embed(description=text)
+            self.titleTXT.append(embed)
+            
 
         #set up cast vote button
         self.btn: discord.ui.button = (Button(label="Click Here to Cast Vote", style=discord.ButtonStyle.primary, custom_id="InitButton", row=2))
@@ -137,16 +154,16 @@ class InitBallot(discord.ui.View):
     #Send ephemeral message with current leader
     async def seeCurrentResults(self, interaction:discord.Interaction):
         await deferInt(interaction)
-        try:
+        '''try:
             imgID = self.BVIObject.createBar()
         except Exception as e:
-            secondLogger.log(f"This was a false ballot by {interaction.user}", True, False)
-            secondLogger.log(e, True, False)
-            secondLogger.log(self.BVIObject.resultsJSON, True, False)
+            #secondLogger.log(f"This was a false ballot by {interaction.user}", True, False)
+            #secondLogger.log(e, True, False)
+            #secondLogger.log(self.BVIObject.resultsJSON, True, False)
         score = f"graphTemp/2{imgID}.png"
         runoff = f"graphTemp/1{imgID}.png"
-        files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]
-        await interaction.followup.send(files = files, content=f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details", ephemeral=True)
+        files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
+        await interaction.followup.send(content=f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details", ephemeral=True)
 
     #Save data to database
     def saveToSQL(self, messageId: str, channelId: str) -> None:
@@ -358,7 +375,7 @@ class Ballot(discord.ui.View):
         else:
             text = "There was a server error. Please try again later."
 
-        #prepare graphs
+        '''#prepare graphs
         try:
             imgID = self.BVIObject.createBar()
         except Exception as e:
@@ -368,11 +385,11 @@ class Ballot(discord.ui.View):
         score = f"graphTemp/2{imgID}.png"
         score = f"graphTemp/2{imgID}.png"
         runoff = f"graphTemp/1{imgID}.png"
-        files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]
+        files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
         
         
         #Send confirmation
-        await interaction.followup.edit_message(message_id=self.msgID, content=text, attachments=files, view=None)
+        await interaction.followup.edit_message(message_id=self.msgID, content=text, view=None)
         self.complete = True
     async def pageCounterCallback(self, interaction: discord.Interaction):
         await deferInt(interaction)
@@ -431,7 +448,7 @@ class turnToBV(discord.ui.View):
         #make Init ballot, save it to database, and delete the change to STAR button
         view=InitBallot(self.bot, Translator.electJSON, Translator)
         index = str(self.initBallotTrackerObj.addInitBallot(view))
-        msg: discord.Message = await interaction.followup.send(embed=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])
+        msg: discord.Message = await interaction.followup.send(embeds=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])
         self.initBallotTrackerObj.initBallots[index].saveToSQL(msg.id, msg.channel.id)
         await self.message.delete()
         await self.on_timeout()
