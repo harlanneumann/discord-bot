@@ -90,7 +90,7 @@ class InitBallot(discord.ui.View):
             #set up candidates as items in the UI
             self.candItems = []
             for i in range(len(self.candidates)):
-                if len(self.candidates[i]['candidate_name']) > 15:
+                if len(self.candidates[i]['candidate_name']) > 30:
                     buttons = False
                     break
                 self.candItems.append(Button(label=self.candidates[i]['candidate_name']))

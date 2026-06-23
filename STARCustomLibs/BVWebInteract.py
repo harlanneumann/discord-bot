@@ -114,10 +114,6 @@ class BVWebTranslator:
                 "settings": {
                     "voter_access": "open",
                     "voter_authentication": {
-                        "address": False,
-                        "email": False,
-                        "ip_address": False,
-                        "phone": False,
                         "voter_id": True
                     },
                     "public_results": True,
@@ -127,9 +123,10 @@ class BVWebTranslator:
 
         #send payload
         resp = requests.post(url=url, json= payload)
+        print(vars(resp))
         resp = resp.json()
         #TODO account for fail sends
-
+        
         self.electionID = resp['election']['election_id']
         #assign self the election just created
         self.assignElection(self.electionID)
