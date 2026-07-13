@@ -1,21 +1,41 @@
-import discord
-import datetime
+import asyncio
+import time
 
-#when making a request call waitForRate
-#wait for rate checks dict
-#If that channel/guild combo doesnt exist, it makes it. This also means the limit should be fine so it passes
-#If it does it checks the data there to determine if it can pass
-#Repetedly check the above and global limit every .5 seconds until it can pass
-#reurn nothing
 
+#Discord.py automatically checks for most rate limiting, but not global. This tracks global rate limiting
+#When we get too close to the limit, it is logged in a database as well as whether it happened during startup, as this is the most common time for it and the solution for that is far simpler than other rate limiting issues
+#Limit as of writing is 50 per second
+
+#If we hit this number, we make note of it. It may be time to split the bots
+barrier = 45
 class rateCheck():
-    def __init__(self, bot:discord.Bot):
-        self.bot = bot
-        #A dict of tuples. The key is a str of f"{guildID}{channelID}" = 0 is the limit at that time, 1 is the cooldown
-        self.rateData = {}
+    
+    def __init__(self):
+        #collection of all channels interaction data. "1" represents interactions that have no channel id, such as changing bot's online status
+        self.globalInteractions = []
+        self.deployment = True
+        self.decrementAmount = .05
 
-    async def waitForRate(self, channelID, guildID):
-        try:
-            item = self.rateData[str(f"{channelID}{guildID}")]
-        except:
-            pass
+    #Add interaction to be ticked down
+    def addInteraction(self):
+        self.globalInteractions.append(1)
+    
+    #tick all items down by .05 seconds. Remove all items with a value 0 or less
+    def tickDown(self):
+        for i in range(len(self.globalInteractions)):
+            self.globalInteractions[i] -= self.decrementAmount
+        self.globalInteractions = [x for x in self.globalInteractions if x > 0]
+
+    #Wait for a clear global rate limit
+    #This should be called before every discord API call
+    async def wait(self):
+        while True:
+            if len(self.globalInteractions) >= barrier:
+                await asyncio.sleep(1)
+            else:
+                self.addInteraction()
+                return
+
+
+
+  

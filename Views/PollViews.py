@@ -61,6 +61,7 @@ class InitBallotTracker():
 async def deferInt(interaction: discord.Interaction):
     logger.log(f"Responding to interaction that expires at {interaction.expires_at} initiated by user {interaction.user}", False, False)
     try:
+        await rateLimits.wait()
         await interaction.response.defer(ephemeral=True)
     except Exception as e:
         print(f"defer failed: {e}")
@@ -142,13 +143,16 @@ class InitBallot(discord.ui.View):
         await deferInt(interaction)
         alrVot = self.BVIObject.alreadyVoted(interaction.user.id)
         if alrVot:
+            await rateLimits.wait()
             await interaction.followup.send("You have already voted in this election", ephemeral=True)
         elif not alrVot:
             view = Ballot(self.bot, self.title, self.candidates, self.BVIObject)
             self.ballotViews.append(view)
+            await rateLimits.wait()
             msgID = await interaction.followup.send(view.description, view= self.ballotViews[-1], ephemeral=True)
             self.ballotViews[-1].msgID = msgID.id
         else:
+            await rateLimits.wait()
             await interaction.followup.send("There was a server error. Please try again later.", ephemeral=True)
     
     #Send ephemeral message with current leader
@@ -163,6 +167,7 @@ class InitBallot(discord.ui.View):
         score = f"graphTemp/2{imgID}.png"
         runoff = f"graphTemp/1{imgID}.png"
         files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
+        await rateLimits.wait()
         await interaction.followup.send(content=f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details", ephemeral=True)
 
     #Save data to database
@@ -343,6 +348,7 @@ class Ballot(discord.ui.View):
         if not self.currentPage == 0:
             self.currentPage -= 1
             self.refreshDropdowns()
+            await rateLimits.wait()
             await interaction.edit_original_response(view=self.pages[self.currentPage])
     async def nextCallback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
@@ -350,6 +356,7 @@ class Ballot(discord.ui.View):
         if not self.currentPage == self.lastPage:
             self.currentPage += 1
             self.refreshDropdowns()
+            await rateLimits.wait()
             await interaction.edit_original_response(view=self.pages[self.currentPage])
     async def submitCallback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
@@ -389,6 +396,7 @@ class Ballot(discord.ui.View):
         
         
         #Send confirmation
+        await rateLimits.wait()
         await interaction.followup.edit_message(message_id=self.msgID, content=text, view=None)
         self.complete = True
     async def pageCounterCallback(self, interaction: discord.Interaction):
@@ -425,6 +433,7 @@ class turnToBV(discord.ui.View):
 
         #if button user isnt the user who made the poll, refuse to make it
         if not interaction.user.id == self.message.author.id:
+            await rateLimits.wait()
             interaction.followup.send("Only the creator of this poll can turn it into a STAR poll", ephemeral=True)
             return
 
@@ -448,14 +457,19 @@ class turnToBV(discord.ui.View):
         #make Init ballot, save it to database, and delete the change to STAR button
         view=InitBallot(self.bot, Translator.electJSON, Translator)
         index = str(self.initBallotTrackerObj.addInitBallot(view))
+        await rateLimits.wait()
         msg: discord.Message = await interaction.followup.send(embeds=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])
         self.initBallotTrackerObj.initBallots[index].saveToSQL(msg.id, msg.channel.id)
+        await rateLimits.wait()
         await self.message.delete()
+        await rateLimits.wait()
         await self.on_timeout()
 
     #delete self after 5 minutes of non use
     async def on_timeout(self):
+        await rateLimits.wait()
         msg : discord.Message = await self.bot.get_channel(self.channelID).fetch_message(self.messageID)
+        await rateLimits.wait()
         await msg.delete()
     #get own message data for deletion purposes
     def ownData(self, channelID, messageID):
