@@ -58,7 +58,7 @@ class InitBallotTracker():
         return num
 
 #defer an interaction
-async def deferInt(interaction: discord.Interaction):
+async def deferInt(interaction: discord.Interaction, rateLimits):
     logger.log(f"Responding to interaction that expires at {interaction.expires_at} initiated by user {interaction.user}", False, False)
     try:
         await rateLimits.wait()
@@ -70,10 +70,11 @@ async def deferInt(interaction: discord.Interaction):
 
 #View for message that will initiate ballot casting. This shows title, desc, options, and the cast vote button. This is not the ballot itself
 class InitBallot(discord.ui.View):
-    def __init__(self, bot: commands.bot, data: dict, BVIObject: BVI.BVWebTranslator):
+    def __init__(self, bot: commands.bot, data: dict, BVIObject: BVI.BVWebTranslator, rateLimits):
         super().__init__(timeout=None)
         self.bot = bot
         self.BVIObject = BVIObject
+        self.rateLimits = rateLimits
 
         #sort relevant dict entries into easy to access variables
         self.title = data['election']['title']
@@ -140,24 +141,24 @@ class InitBallot(discord.ui.View):
     #function to send Ballot. Technically all buttons can begin a ballot to avoid frusturations with users who dont understand STAR voting
     async def button_callback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
         alrVot = self.BVIObject.alreadyVoted(interaction.user.id)
         if alrVot:
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             await interaction.followup.send("You have already voted in this election", ephemeral=True)
         elif not alrVot:
-            view = Ballot(self.bot, self.title, self.candidates, self.BVIObject)
+            view = Ballot(self.bot, self.title, self.candidates, self.BVIObject, self.rateLimits)
             self.ballotViews.append(view)
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             msgID = await interaction.followup.send(view.description, view= self.ballotViews[-1], ephemeral=True)
             self.ballotViews[-1].msgID = msgID.id
         else:
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             await interaction.followup.send("There was a server error. Please try again later.", ephemeral=True)
     
     #Send ephemeral message with current leader
     async def seeCurrentResults(self, interaction:discord.Interaction):
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
         '''try:
             imgID = self.BVIObject.createBar()
         except Exception as e:
@@ -167,7 +168,7 @@ class InitBallot(discord.ui.View):
         score = f"graphTemp/2{imgID}.png"
         runoff = f"graphTemp/1{imgID}.png"
         files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         await interaction.followup.send(content=f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details", ephemeral=True)
 
     #Save data to database
@@ -192,12 +193,13 @@ class Ballot(discord.ui.View):
 
     #class for dropdown menus
     class rankMenu(discord.ui.Select):
-        def __init__(self, candidate: int, candName: str, save):
+        def __init__(self, candidate: int, candName: str, save, rateLimits):
             #integer that refers to the candidate. (if a candidate is the 4th object in the candidate list, the 4th object in the dropdown list will refer to it)
             self.candNum = candidate
             #candidate name
             self.candName = candName
             self.save = save
+            self.rateLimits = rateLimits
 
             #has this dropdown been used before?
             self.used = False
@@ -206,7 +208,7 @@ class Ballot(discord.ui.View):
             rankLabels = ["❌", "⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"]
             #concats candidate name and rank labels for select menu options
             for i in range(len(rankLabels)):
-                text = (f"{rankLabels[i]}: {candName}")
+                text = (f"{candName}: {rankLabels[i]}")
                 options.append(discord.SelectOption(label=text, value=rankLabels[i]))
 
             super().__init__(placeholder=self.candName, min_values=0, max_values=1, options=options)
@@ -214,7 +216,7 @@ class Ballot(discord.ui.View):
         #called when option is selected
         async def callback(self, interaction: discord.Interaction):
             #this line seems to do nothing, but discord doesnt consider the interaction responded without it
-            await deferInt(interaction)
+            await deferInt(interaction, self.rateLimits)
             #this dropdown has been used
             self.used = True
             #save score
@@ -244,10 +246,11 @@ class Ballot(discord.ui.View):
 
 
     #init for Ballot
-    def __init__(self, bot:commands.bot, title:str, candidates:dict, BVIObject, description:str = "Not scoring is the same as scoring 0. Feel free to skip candidates you don't know and to score multiple candidates the same", timeout: float = 300.0):
+    def __init__(self, bot:commands.bot, title:str, candidates:dict, BVIObject, rateLimits, description:str = "Not scoring is the same as scoring 0. Feel free to skip candidates you don't know and to score multiple candidates the same", timeout: float = 300.0):
         super().__init__(timeout=900)
         self.bot = bot
         self.BVIObject = BVIObject
+        self.rateLimits = rateLimits
         self.title = title
         self.candidates = candidates
         self.description = description
@@ -282,7 +285,7 @@ class Ballot(discord.ui.View):
         tempPage: list = []
         tempView = ""
         for i in range(len(self.candidates)):
-            tempPage.append(self.rankMenu(i, self.candidates[i]['candidate_name'], self.save))
+            tempPage.append(self.rankMenu(i, self.candidates[i]['candidate_name'], self.save, self.rateLimits))
             temp += 1
             if temp == 4 or i == (len(self.candidates) - 1):
                 temp = 0
@@ -344,23 +347,23 @@ class Ballot(discord.ui.View):
     #TODO there is likely a slightly more efficient way to do this
     async def prevCallback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
         if not self.currentPage == 0:
             self.currentPage -= 1
             self.refreshDropdowns()
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             await interaction.edit_original_response(view=self.pages[self.currentPage])
     async def nextCallback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
         if not self.currentPage == self.lastPage:
             self.currentPage += 1
             self.refreshDropdowns()
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             await interaction.edit_original_response(view=self.pages[self.currentPage])
     async def submitCallback(self, interaction:discord.Interaction):
         #respond immeditately, interactions fail if not responded to in 3 seconds
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
         #prepare scores
         scores = []
         for i in self.save.scores:
@@ -396,11 +399,11 @@ class Ballot(discord.ui.View):
         
         
         #Send confirmation
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         await interaction.followup.edit_message(message_id=self.msgID, content=text, view=None)
         self.complete = True
     async def pageCounterCallback(self, interaction: discord.Interaction):
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
     #ballot is void after 900 seconds
     #TODO add a feature that resets the timer after any activity
     async def on_timeout(self):
@@ -417,9 +420,10 @@ class Ballot(discord.ui.View):
 
 #Sent after discord native poll is sent. Clicking the button deletes the poll and makes a STAR poll with that data
 class turnToBV(discord.ui.View):
-    def __init__(self, bot: commands.bot, message: discord.Message, initBallotTrackerObj : InitBallotTracker):
+    def __init__(self, bot: commands.bot, message: discord.Message, initBallotTrackerObj : InitBallotTracker, rateLimits):
         super().__init__(timeout=300)
         self.bot = bot
+        self.rateLimits = rateLimits
         self.message:discord.Message = message
         self.initBallotTrackerObj = initBallotTrackerObj
         self.btn = Button(label="Click Here to Turn Into a STAR Poll", style=discord.ButtonStyle.primary)
@@ -429,11 +433,11 @@ class turnToBV(discord.ui.View):
 
     #when button is pressed stop timeout, get poll data,  and turn into a star poll
     async def callback(self, interaction: discord.Interaction):
-        await deferInt(interaction)
+        await deferInt(interaction, self.rateLimits)
 
         #if button user isnt the user who made the poll, refuse to make it
         if not interaction.user.id == self.message.author.id:
-            await rateLimits.wait()
+            await self.rateLimits.wait()
             interaction.followup.send("Only the creator of this poll can turn it into a STAR poll", ephemeral=True)
             return
 
@@ -455,21 +459,21 @@ class turnToBV(discord.ui.View):
         Translator.createElection(question, duration, self.message.author.id, answers)
 
         #make Init ballot, save it to database, and delete the change to STAR button
-        view=InitBallot(self.bot, Translator.electJSON, Translator)
+        view=InitBallot(self.bot, Translator.electJSON, Translator, self.rateLimits)
         index = str(self.initBallotTrackerObj.addInitBallot(view))
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         msg: discord.Message = await interaction.followup.send(embeds=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])
         self.initBallotTrackerObj.initBallots[index].saveToSQL(msg.id, msg.channel.id)
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         await self.message.delete()
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         await self.on_timeout()
 
     #delete self after 5 minutes of non use
     async def on_timeout(self):
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         msg : discord.Message = await self.bot.get_channel(self.channelID).fetch_message(self.messageID)
-        await rateLimits.wait()
+        await self.rateLimits.wait()
         await msg.delete()
     #get own message data for deletion purposes
     def ownData(self, channelID, messageID):

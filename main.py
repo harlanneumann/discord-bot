@@ -73,7 +73,7 @@ if __name__ == "__main__":
         elections[electionid] = Translator
         
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
-        view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator)
+        view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator, rateLimits)
         index = initBallotViews.addInitBallot(view)
         return str(index)
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
             return
         
         #If the message is a poll respond with the turnToBV view which alows the user to turn it into a STAR poll
-        view = PollViews.turnToBV(bot, message, initBallotViews)
+        view = PollViews.turnToBV(bot, message, initBallotViews, rateLimits)
         await rateLimits.wait()
         sentMessage : discord.Message = await message.reply(view=view)
         #this function is necessary so the message can delete itself after 5 minutes
