@@ -232,7 +232,6 @@ class BVWebTranslator:
         
         print("Results")
         print(self.resultsJSON)
-        
         #This gets the relevant data and sorts it for the graph
         #Be careful when changing this, the API will change how some of this data is ordered. It is currently set up to use data whose order doesnt move
         winID = self.resultsJSON['results'][0]['roundResults'][0]['winners'][0]['id']
@@ -257,7 +256,56 @@ class BVWebTranslator:
 
     #Create an ASCII bar graph instead to reduce load times
     def createASCIIBar(self) -> str:
-        pass
+        #update results, the prepare data for graphs
+        self.updateResults()
+        categories = []
+        votes = []
+        for candidate in self.prepCands():
+            categories.append(candidate[0])
+            votes.append(candidate[1])
+        categories.reverse()
+        votes.reverse()
+        
+        print("Results")
+        print(self.resultsJSON)
+        #This gets the relevant data and sorts it for the graph
+        #Be careful when changing this, the API will change how some of this data is ordered. It is currently set up to use data whose order doesnt move
+        winID = self.resultsJSON['results'][0]['roundResults'][0]['winners'][0]['id']
+        runID = self.resultsJSON['results'][0]['roundResults'][0]['runner_up'][0]['id']
+        finalists = [self.winner, self.resultsJSON['results'][0]['roundResults'][0]['runner_up'][0]['name'], "Equal Support"]
+        finalistVotes =  [self.resultsJSON['results'][0]['roundResults'][0]['winners'][0]['votesPreferredOver'][runID], self.resultsJSON['results'][0]['roundResults'][0]['runner_up'][0]['votesPreferredOver'][winID], self.resultsJSON['results'][0]['roundResults'][0]['logs'][1]['equal_votes']]
+        
+        maxVotes = votes[0]
+        #Make a single bar for the graph
+        def makeBar(maximum, currentNum, name):
+            #If name is short enough, add spaces to make it to maxNameLen
+            #Else limit to maxNameLen and add "..." to end
+            maxNameLen = 10
+            if len(name) <= maxNameLen:
+                barName = maxNameLen - len(name)
+            else:
+                barName = f"{name[:(maxNameLen - 3)]}..."
+
+            #Run math to determine || to :: ratio
+            #Theres 20 characters in the actual bar, this determines how much is empty
+            barLength = 20
+            num = currentNum
+            secNum = maximum
+            hold = secNum/num
+            hold = hold * 100
+            rounded = 5 * round(hold/5)
+            barCount = rounded/5
+            barCount = int(final)
+
+            #Make the actual bar
+            for i in barCount:
+                bar = f"{bar}|"
+            for i in (barLength - barCount):
+                bar = f"{bar}:"
+            bar = f"{bar} {currentNum}"
+            
+            #Make string maxNameLen... ] bar (num)
+            return f"{barName} ] {bar}"
 
         
         

@@ -27,6 +27,7 @@ database = database.cursor()
 #Time is never null, even when election expires, as a failsafe
 database.execute("CREATE TABLE IF NOT EXISTS InitBallots (id INTEGER PRIMARY KEY, messageID INTEGER NOT NULL, channelID INTEGER NOT NULL, electionID TEXT NOT NULL, time INTEGER NOT NULL)")
 
+
 #get data set up in a dictionary to prep for pollViews
 #takes a BVWebTranslator object and returns the relevant data from its JSON
 def prepView(BVIObject) -> dict:
@@ -70,8 +71,10 @@ async def deferInt(interaction: discord.Interaction, rateLimits):
 
 #View for message that will initiate ballot casting. This shows title, desc, options, and the cast vote button. This is not the ballot itself
 class InitBallot(discord.ui.View):
-    def __init__(self, bot: commands.bot, data: dict, BVIObject: BVI.BVWebTranslator, rateLimits):
+    def __init__(self, bot: commands.bot, data: dict, BVIObject: BVI.BVWebTranslator, rateLimits, originalInteraction: discord.Interaction):
+        
         super().__init__(timeout=None)
+
         self.bot = bot
         self.BVIObject = BVIObject
         self.rateLimits = rateLimits
@@ -134,9 +137,6 @@ class InitBallot(discord.ui.View):
         
         
 
-
-
-        
 
     #function to send Ballot. Technically all buttons can begin a ballot to avoid frusturations with users who dont understand STAR voting
     async def button_callback(self, interaction:discord.Interaction):
@@ -384,6 +384,7 @@ class Ballot(discord.ui.View):
             text = "You have already voted in this election"
         else:
             text = "There was a server error. Please try again later."
+        self.BVIObject.createASCIIBar()
 
         '''#prepare graphs
         try:
@@ -459,7 +460,7 @@ class turnToBV(discord.ui.View):
         Translator.createElection(question, duration, self.message.author.id, answers)
 
         #make Init ballot, save it to database, and delete the change to STAR button
-        view=InitBallot(self.bot, Translator.electJSON, Translator, self.rateLimits)
+        view=InitBallot(self.bot, Translator.electJSON, Translator, self.rateLimits, interaction)
         index = str(self.initBallotTrackerObj.addInitBallot(view))
         await self.rateLimits.wait()
         msg: discord.Message = await interaction.followup.send(embeds=self.initBallotTrackerObj.initBallots[index].titleTXT, view=self.initBallotTrackerObj.initBallots[index])

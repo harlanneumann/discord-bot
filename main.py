@@ -32,6 +32,8 @@ if __name__ == "__main__":
     #tree = app_commands.CommandTree(bot)
 
     load_dotenv()
+    #For tracking times when the bot is attempted to be used outside of testing
+    illegalPolls = PunkinLogging.errorLogger(f"{os.getenv('PUNKIN_PATH')}/illegalPolls.txt")
     TOKEN = os.getenv('DISCORD_TOKEN')
     #jwt_secret_key = os.getenv('JWT_SECRET_KEY')
     #jwt_token = os.getenv('JWT_TOKEN')
@@ -44,6 +46,21 @@ if __name__ == "__main__":
     #Object that tracks rate limiting
     rateLimits = rateLimitCheck.rateCheck()
 
+    #This code should be removed from the public version, as it is unnecessary
+    #For more information, ctrl F "allowedServers"
+    #Is the allowed servers list empty? That means this bot is public and this check is unnecessary
+    #If not, make sure the bot is allowed here
+    allowedGuild = (os.getenv("APPROVED_SERVERS").split(","))
+    rejectText = "This bot is for testing only and shouldn't be in this server. Once a public release is available, a link to it will be available in this bot's bio"
+    def validGuild(guildId):
+        strGuildId = str(guildId)
+        if len(allowedGuild) == 0:
+            return False
+        if strGuildId in allowedGuild:
+            return False
+        illegalPolls.log(strGuildId, False, False)
+        return True
+    
     #Command to get an election from better voting and begin voting in discord
     #command syntax is /linkpoll [electionID]
     @bot.tree.command(
@@ -55,7 +72,10 @@ if __name__ == "__main__":
     )
     async def link_poll(interaction: discord.Interaction, electionid: str):
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
-
+        if validGuild(interaction.guild.id):
+            await rateLimits.wait()
+            await interaction.response.send_message(rejectText)
+            return
         index = await pollLink(interaction, electionid)
         await rateLimits.wait()
         msg = await interaction.response.send_message(embeds = initBallotViews.initBallots[index].titleTXT, view=initBallotViews.initBallots[index])
@@ -73,7 +93,7 @@ if __name__ == "__main__":
         elections[electionid] = Translator
         
         #With election object created, create view and send message for ballot casting. Then save the data to the database to be pulled after redeploy
-        view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator, rateLimits)
+        view = PollViews.InitBallot(bot, elections[electionid].electJSON, Translator, rateLimits, interaction)
         index = initBallotViews.addInitBallot(view)
         return str(index)
 
@@ -82,6 +102,11 @@ if __name__ == "__main__":
         #Is message from self or is the message not a poll? If so ignore it
         #Bot never does the standard check if the message is from itself as it should not send discord native polls
         if message.poll == None:
+            return
+        
+        if validGuild(message.guild.id):
+            await rateLimits.wait()
+            await message.reply(rejectText)
             return
         
         #If the message is a poll respond with the turnToBV view which alows the user to turn it into a STAR poll
