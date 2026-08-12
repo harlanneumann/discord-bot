@@ -168,8 +168,11 @@ class InitBallot(discord.ui.View):
         score = f"graphTemp/2{imgID}.png"
         runoff = f"graphTemp/1{imgID}.png"
         files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
+        text = f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details\n\n"
+        submitView = Submission(self.bot, text, self.BVIObject, None, self.rateLimits)
         await self.rateLimits.wait()
-        await interaction.followup.send(content=f"The current leader is {self.BVIObject.winner}\nSee https://bettervoting.com/{self.BVIObject.electionID}/results for more details", ephemeral=True)
+        msg = await interaction.followup.send(content=text, view=submitView, ephemeral=True)
+        submitView.msgID = msg.id
 
     #Save data to database
     def saveToSQL(self, messageId: str, channelId: str) -> None:
@@ -384,8 +387,8 @@ class Ballot(discord.ui.View):
             text = "You have already voted in this election"
         else:
             text = "There was a server error. Please try again later."
-        self.BVIObject.createASCIIBar()
-
+        text = f"{text}\n\n"
+        
         '''#prepare graphs
         try:
             imgID = self.BVIObject.createBar()
@@ -398,11 +401,10 @@ class Ballot(discord.ui.View):
         runoff = f"graphTemp/1{imgID}.png"
         files = [File(score, filename="score.png"), File(runoff, filename="runoff.png")]'''
         
-        
+        submitView = Submission(self.bot, text, self.BVIObject, self.msgID, self.rateLimits)
         #Send confirmation
         await self.rateLimits.wait()
-        await interaction.followup.edit_message(message_id=self.msgID, content=text, view=None)
-        self.complete = True
+        await interaction.followup.edit_message(message_id=self.msgID, content=f"{text}", view=submitView)
     async def pageCounterCallback(self, interaction: discord.Interaction):
         await deferInt(interaction, self.rateLimits)
     #ballot is void after 900 seconds
@@ -417,6 +419,31 @@ class Ballot(discord.ui.View):
         print(self.currentPage)
         print(self.lastPage)
         print(len(self.pages))
+
+#Sends the main response text as well as a button that will generate graphs
+class Submission(discord.ui.View):
+    def __init__(self, bot:commands.bot, text, BVIObject, msgID, rateLimits):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.text = text
+        self.BVIObject = BVIObject
+        self.msgID = msgID
+        self.rateLimits = rateLimits
+
+        self.btn: discord.ui.Button = (discord.ui.Button(label="Click here to learn more", style=discord.ButtonStyle.primary))
+        self.btn.callback= self.button_callback
+        self.add_item(self.btn)
+    
+    async def button_callback(self, interaction):
+        await deferInt(interaction, self.rateLimits)
+        #back ticks cause discord to post as a code snippet, which avoids formatting errors
+        graphText = f"```{self.BVIObject.createASCIIBar()}```"
+        text = f"{self.text}{graphText}"
+        await self.rateLimits.wait()
+        await interaction.followup.edit_message(message_id=self.msgID, content=text, view=None)
+
+
+
 
 
 #Sent after discord native poll is sent. Clicking the button deletes the poll and makes a STAR poll with that data

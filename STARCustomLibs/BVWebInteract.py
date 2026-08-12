@@ -265,6 +265,8 @@ class BVWebTranslator:
             votes.append(candidate[1])
         categories.reverse()
         votes.reverse()
+
+        print(f"\n\n{categories}\n\n")
         
         print("Results")
         print(self.resultsJSON)
@@ -280,35 +282,60 @@ class BVWebTranslator:
         def makeBar(maximum, currentNum, name):
             #If name is short enough, add spaces to make it to maxNameLen
             #Else limit to maxNameLen and add "..." to end
-            maxNameLen = 10
+            maxNameLen = 8
             if len(name) <= maxNameLen:
-                barName = maxNameLen - len(name)
+                spaces = ""
+                for i in range(maxNameLen - len(name)):
+                    spaces = f"{spaces} "
+                barName = f"{name}{spaces}"
             else:
                 barName = f"{name[:(maxNameLen - 3)]}..."
 
             #Run math to determine || to :: ratio
             #Theres 20 characters in the actual bar, this determines how much is empty
             barLength = 20
-            num = currentNum
-            secNum = maximum
+            num = maximum
+            secNum = currentNum
             hold = secNum/num
             hold = hold * 100
             rounded = 5 * round(hold/5)
             barCount = rounded/5
-            barCount = int(final)
+            barCount = int(barCount)
 
             #Make the actual bar
-            for i in barCount:
-                bar = f"{bar}|"
-            for i in (barLength - barCount):
-                bar = f"{bar}:"
+            bar = ""
+            for i in range(barCount):
+                bar = f"{bar}="
+            for i in range((barLength - barCount)):
+                bar = f"{bar}-"
             bar = f"{bar} {currentNum}"
             
             #Make string maxNameLen... ] bar (num)
-            return f"{barName} ] {bar}"
+            return f"{barName}]{bar}"
 
+        text1 = "First, the scores are tallied\n\n"
+        text2 = "Next, the two top scorers advance to the runoff round. Each voter's vote goes to the finalist they scored highest\n\n"
+        text3 = "This way people can vote their conscience instead of the lesser of two evils, and every vote gets a say!\n\n"
+
+        scoreBars = []
+        for i in range(len(categories)):
+            scoreBars.append(makeBar(maxVotes, votes[i], categories[i]))
+        runoffBars = []
+        for i in range(len(finalists)-1):
+            runoffBars.append(makeBar(finalistVotes[0], finalistVotes[i], finalists[i]))
+        runoffBars.append(makeBar(finalistVotes[0], finalistVotes[2], "Equal"))
         
-        
+        finalText = text1
+        for i in scoreBars:
+            finalText = f"{finalText}{i}\n"
+        finalText = f"{finalText}\n\n{text2}"
+        for i in runoffBars:
+            finalText = f"{finalText}{i}\n"
+        finalText = f"{finalText}\n\n{text3}"
+        print(finalText)
+        return finalText
+
+    
     #Get a simple list of candidate names and scores. Sorting is unnecessary, they arrive in order
     def prepCands(self) -> list:
         candidates = []
