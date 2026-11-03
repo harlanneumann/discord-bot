@@ -134,6 +134,7 @@ if __name__ == "__main__":
                     initBallotViews.initBallots[index].channelID = column2
                 except Exception as e:
                     logger.log(log="message not found, likely deleted by users", type="debug", lead = column3)
+                    #TODO delete the message from database when this happens. Not adding now because the database will be switched to postgres
 
             tasks = []
             for i in range(len(rows)):

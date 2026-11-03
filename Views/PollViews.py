@@ -64,10 +64,13 @@ class InitBallotTracker():
     async def checkFinish(self):
         async def finishElection(key):
             try:
-                logger.log(f"The channedId is {self.initBallots[key].channelId}", lead=self.initBallots[key].BVIObject.electionID)
-                if self.initBallots[key].channelId:
-                    await self.initBallots[key].completeElection()
-                    del self.initBallots[key]
+                if self.initBallots[key].BVIObject.checkForCompletionCertain():
+                    logger.log(f"The channedId is {self.initBallots[key].channelId}", lead=self.initBallots[key].BVIObject.electionID)
+                    if self.initBallots[key].channelId:
+                        await self.initBallots[key].completeElection()
+                        del self.initBallots[key]
+                else:
+                    logger.log("Election not actually closed, found after updating results. No action taken", "debug", lead=self.initBallots[key].BVIObject.electionID)
             except Exception as e:
                 logger.log(f"Attempted to complete an InitBallot but got this error: {e}", "error", lead=f"election ID: {self.initBallots[key].BVIObject.electionID}")
                 traceback.print_exc()
@@ -77,7 +80,8 @@ class InitBallotTracker():
             return
         tasks = []
         for key, value in self.initBallots.items():
-            if self.initBallots[key].BVIObject.checkForCompletion():
+            #Call uncertain first so we can quickly loop through items, rather than waiting for responses from the website for every closed election
+            if self.initBallots[key].BVIObject.checkForCompletionUncertain():
                 logger.log(f"Positioning election for completion in discord", type="debug", lead=f"{self.initBallots[key].BVIObject.electionID}")
                 tasks.append(asyncio.create_task(finishElection(key)))
         logger.log(f"Completing positioned elections", type="debug")
