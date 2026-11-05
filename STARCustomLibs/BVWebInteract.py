@@ -154,20 +154,15 @@ class BVWebTranslator:
     #If so, you should call CheckForCompletionCertain
     #We do it this way so that the website isn't bombarded with hundreds of pings every second
     def checkForCompletionUncertain(self):
-        #The election has no end time, dont close it
-        if self.electJSON["election"]["end_time"] == None:
-            return False
-        endTime = datetime.datetime.fromisoformat(self.electJSON["election"]["end_time"])
         state = self.electJSON["election"]["state"]
         #According to current data the election should be closed.
-        if datetime.datetime.now(datetime.timezone.utc) >= endTime or state == "closed":
+        if state == "closed":
             return True
         return False
     def checkForCompletionCertain(self):
         self.updateResults()
-        endTime = datetime.datetime.fromisoformat(self.electJSON["election"]["end_time"])
         state = self.electJSON["election"]["state"]
-        if datetime.datetime.now(datetime.timezone.utc) >= endTime or state == "closed":
+        if state == "closed":
             return True
         return False
         
